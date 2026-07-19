@@ -1,4 +1,4 @@
-ort ccxt
+import ccxt
 import time
 import requests
 import pandas as pd
