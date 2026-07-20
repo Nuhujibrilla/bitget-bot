@@ -1,5 +1,3 @@
-No am asking here 
-
 import ccxt
 import time
 import requests
@@ -7,13 +5,13 @@ import pandas as pd
 import ta
 import os
 
-# ========== DO NOT PUT KEYS HERE. PUT THEM IN RENDER ==========
+# ========== KEYS COME FROM RENDER ENVIRONMENT ==========
 API_KEY = os.environ.get("API_KEY")
 API_SECRET = os.environ.get("API_SECRET") 
 API_PASSWORD = os.environ.get("API_PASSWORD")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-# ==============================================================
+# =======================================================
 
 # Connect to Bitget
 exchange = ccxt.bitget({
@@ -25,20 +23,26 @@ exchange = ccxt.bitget({
 })
 
 def send_telegram(message):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram keys missing")
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
         requests.post(url, data=data)
-    except:
-        pass
+    except Exception as e:
+        print(f"Telegram error: {e}")
 
 def get_all_usdt_pairs():
-    markets = exchange.load_markets()
-    usdt_pairs = [s for s in markets if s.endswith('/USDT') and markets[s]['spot']]
-    tickers = exchange.fetch_tickers(usdt_pairs)
-    sorted_pairs = sorted(tickers.items(), key=lambda x: x[1]['quoteVolume'] or 0, reverse=True)
-    coins = [s for s, _ in sorted_pairs[:150]]
-    return coins
+    try:
+        markets = exchange.load_markets()
+        usdt_pairs = [s for s in markets if s.endswith('/USDT') and markets[s]['spot']]
+        tickers = exchange.fetch_tickers(usdt_pairs)
+        sorted_pairs = sorted(tickers.items(), key=lambda x: x[1]['quoteVolume'] or 0, reverse=True)
+        coins = [s for s, _ in sorted_pairs[:150]]
+        return coins
+    except:
+        return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'] # fallback
 
 COINS = get_all_usdt_pairs()
 TRADE_AMOUNT = 10
@@ -53,7 +57,8 @@ def get_data(symbol):
         return None
 
 def check_signal(df):
-    if df is None or len(df) < 50: return None
+    if df is None or len(df) < 50: 
+        return None
     df['rsi'] = ta.momentum.RSIIndicator(df['close']).rsi()
     df['ema50'] = ta.trend.EMAIndicator(df['close'], 50).ema_indicator()
     df['ema200'] = ta.trend.EMAIndicator(df['close'], 200).ema_indicator()
