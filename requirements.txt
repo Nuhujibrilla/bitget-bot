@@ -1,5 +1,5 @@
-ccxt
-pandas
-ta
-requests
-python-telegram-bot
+    ccxt
+    python-telegram-bot==21.4
+    flask
+    gunicorn
+    python-dotenv
