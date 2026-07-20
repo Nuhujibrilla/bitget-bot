@@ -49,7 +49,7 @@ def scan():
             print(f"{datetime.now()} | Scanning {len(coins)} coins > ${MIN_COIN_PRICE}...")
             signals = 0
 
-            for symbol in coins:
+          for symbol in coins:
                 try:
                     ticker = exchange.fetch_ticker(symbol)
                     price = ticker['last']
