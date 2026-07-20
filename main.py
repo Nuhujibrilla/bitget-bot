@@ -1,3 +1,5 @@
+No am asking here 
+
 import ccxt
 import time
 import requests
@@ -5,14 +7,15 @@ import pandas as pd
 import ta
 import os
 
-# ========== KEYS COME FROM RENDER ENVIRONMENT ==========
-API_KEY = os.environ.get("API_KEY")bg_e20a831da9d95305247f7ebfe055590d
-API_SECRET = os.environ.get("API_SECRET")30e290e99548c4f6a488f59ffd0f3cbd709df524076e1499923072ee004a4948
-API_PASSWORD = os.environ.get("API_PASSWORD")Nuhu2017
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")8826348504:AAF9MYvnrix5h2jHW-uqtvOiM_7171CXMWo
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")6261057148
-# ====================================================
+# ========== DO NOT PUT KEYS HERE. PUT THEM IN RENDER ==========
+API_KEY = os.environ.get("API_KEY")
+API_SECRET = os.environ.get("API_SECRET") 
+API_PASSWORD = os.environ.get("API_PASSWORD")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+# ==============================================================
 
+# Connect to Bitget
 exchange = ccxt.bitget({
     'apiKey': API_KEY,
     'secret': API_SECRET,
@@ -21,18 +24,6 @@ exchange = ccxt.bitget({
     'options': {'defaultType': 'spot'}
 })
 
-def get_all_usdt_pairs():
-    markets = exchange.load_markets()
-    usdt_pairs = [s for s in markets if s.endswith('/USDT') and markets[s]['spot']]
-    tickers = exchange.fetch_tickers(usdt_pairs)
-    sorted_pairs = sorted(tickers.items(), key=lambda x: x[1]['quoteVolume'] or 0, reverse=True)
-    coins = [s for s, _ in sorted_pairs[:150]] # Keep /USDT format
-    return coins
-
-COINS = get_all_usdt_pairs()
-TRADE_AMOUNT = 10 # $10 per trade
-TIMEFRAME = '15m'
-
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
@@ -40,6 +31,18 @@ def send_telegram(message):
         requests.post(url, data=data)
     except:
         pass
+
+def get_all_usdt_pairs():
+    markets = exchange.load_markets()
+    usdt_pairs = [s for s in markets if s.endswith('/USDT') and markets[s]['spot']]
+    tickers = exchange.fetch_tickers(usdt_pairs)
+    sorted_pairs = sorted(tickers.items(), key=lambda x: x[1]['quoteVolume'] or 0, reverse=True)
+    coins = [s for s, _ in sorted_pairs[:150]]
+    return coins
+
+COINS = get_all_usdt_pairs()
+TRADE_AMOUNT = 10
+TIMEFRAME = '15m'
 
 def get_data(symbol):
     try:
@@ -88,7 +91,7 @@ def scan():
                 place_trade(symbol, side)
                 time.sleep(2)
         print(f"Scan complete. {signals} signals found")
-        time.sleep(900)
+        time.sleep(900) # 15 minutes
 
 if __name__ == "__main__":
     scan()
