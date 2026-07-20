@@ -1,3 +1,5 @@
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import ccxt
 import time
 import requests
@@ -139,5 +141,21 @@ def scan():
         print(f"Scan complete. {signals} signals found")
         time.sleep(900) # 15 minutes
 
+async def chat_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message.text.lower()
+    if "hi" in msg or "hello" in msg:
+        await update.message.reply_text("👋 Hi bro! BRIAN is live and scanning 1106 coins.\n\nSend /status to see what's up")
+    elif "status" in msg:
+        await update.message.reply_text("✅ BRIAN is online and scanning every 15 minutes")
+
+async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ BRIAN is online and scanning every 15 minutes")
+
 if __name__ == "__main__":
-    scan()
+    import threading
+    threading.Thread(target=scan, daemon=True).start()
+    
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("status", status_cmd))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_reply))
+    app.run_polling()
