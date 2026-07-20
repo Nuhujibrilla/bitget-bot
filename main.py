@@ -5,15 +5,14 @@ import pandas as pd
 import ta
 import os
 
-# ========== KEYS COME FROM RENDER ENVIRONMENT ==========
+# ========== KEYS FROM RENDER ==========
 API_KEY = os.environ.get("API_KEY")
 API_SECRET = os.environ.get("API_SECRET") 
 API_PASSWORD = os.environ.get("API_PASSWORD")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-# =======================================================
+# ======================================
 
-# Connect to Bitget
 exchange = ccxt.bitget({
     'apiKey': API_KEY,
     'secret': API_SECRET,
@@ -39,13 +38,16 @@ def get_all_usdt_pairs():
         usdt_pairs = [s for s in markets if s.endswith('/USDT') and markets[s]['spot']]
         tickers = exchange.fetch_tickers(usdt_pairs)
         sorted_pairs = sorted(tickers.items(), key=lambda x: x[1]['quoteVolume'] or 0, reverse=True)
-        coins = [s for s, _ in sorted_pairs[:150]]
+        coins = [s for s, _ in sorted_pairs] # NO LIMIT - scans ALL
         return coins
-    except:
-        return ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'] # fallback
+    except Exception as e:
+        send_telegram(f"Error loading pairs: {e}")
+        return ['BTC/USDT', 'ETH/USDT']
 
 COINS = get_all_usdt_pairs()
-TRADE_AMOUNT = 10
+TRADE_AMOUNT_USDT = 10  # $10 per trade
+SL_PERCENT = 0.01  # 1% stop loss
+TP_PERCENT = 0.02  # 2% take profit
 TIMEFRAME = '15m'
 
 def get_data(symbol):
@@ -70,31 +72,70 @@ def check_signal(df):
         return "SHORT"
     return None
 
-def place_trade(symbol, side):
+def place_trade_with_sl_tp(symbol, signal):
     try:
+        side = 'buy' if signal == "LONG" else 'sell'
         ticker = exchange.fetch_ticker(symbol)
-        amount = TRADE_AMOUNT / ticker['last']
+        price = ticker['last']
+        amount = TRADE_AMOUNT_USDT / price
+        amount = round(amount, 4) # round to 4 decimals
+
+        # 1. PLACE MARKET ORDER
         order = exchange.create_market_order(symbol, side, amount)
-        entry = order['average']
-        sl = entry * 0.99 if side == 'buy' else entry * 1.01
-        tp = entry * 1.02 if side == 'buy' else entry * 0.98
-        send_telegram(f"✅ TRADE EXECUTED\n{symbol} {side.upper()}\nEntry: ${entry:.4f}\nSL: ${sl:.4f} | TP: ${tp:.4f}")
+        entry = order['average'] if order['average'] else price
+        
+        # 2. CALCULATE SL AND TP
+        if side == 'buy':
+            sl_price = entry * (1 - SL_PERCENT)
+            tp_price = entry * (1 + TP_PERCENT)
+        else: # sell
+            sl_price = entry * (1 + SL_PERCENT)
+            tp_price = entry * (1 - TP_PERCENT)
+        
+        sl_price = round(sl_price, 4)
+        tp_price = round(tp_price, 4)
+
+        # 3. PLACE SL AND TP ORDERS
+        exchange.create_order(symbol, 'stop', 'sell' if side=='buy' else 'buy', amount, None, {'stopPrice': sl_price})
+        exchange.create_order(symbol, 'limit', 'sell' if side=='buy' else 'buy', amount, tp_price)
+
+        # 4. ALERT YOU
+        msg = f"""✅ TRADE EXECUTED
+Coin: {symbol}
+Signal: {signal}
+Side: {side.upper()}
+Amount: ${TRADE_AMOUNT_USDT}
+Entry: ${entry:.4f}
+SL: ${sl_price:.4f} (-1%)
+TP: ${tp_price:.4f} (+2%)
+OrderID: {order['id']}"""
+        send_telegram(msg)
+        
     except Exception as e:
         send_telegram(f"❌ TRADE FAILED: {symbol} - {str(e)}")
 
 def scan():
-    send_telegram(f"🤖 BRIAN IS ONLINE\nScanning {len(COINS)} coins every 15min\nMode: spot | ${TRADE_AMOUNT}/trade")
+    send_telegram(f"🤖 BRIAN IS ONLINE\nScanning {len(COINS)} coins every 15min\nMode: AUTO TRADE | ${TRADE_AMOUNT_USDT}/trade | SL:1% TP:2%")
+    traded_coins = set() # to avoid buying same coin twice
+    
     while True:
         signals = 0
         for symbol in COINS:
+            # Skip if we already have a position
+            try:
+                balance = exchange.fetch_balance()
+                base = symbol.split('/')[0]
+                if balance[base]['free'] > 0:
+                    continue
+            except: pass
+            
             df = get_data(symbol)
             signal = check_signal(df)
             if signal:
                 signals += 1
-                side = 'buy' if signal == "LONG" else 'sell'
-                send_telegram(f"🚨 SIGNAL: {symbol} {signal}")
-                place_trade(symbol, side)
-                time.sleep(2)
+                send_telegram(f"🚨 SIGNAL FOUND: {symbol} {signal}\nAuto-buying now...")
+                place_trade_with_sl_tp(symbol, signal)
+                time.sleep(3)
         print(f"Scan complete. {signals} signals found")
         time.sleep(900) # 15 minutes
 
