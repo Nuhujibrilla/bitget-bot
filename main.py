@@ -1,8 +1,10 @@
 from flask import Flask
 import threading
+import time
+import requests # ADDED FOR KEEP ALIVE
 app = Flask('') # Keep Render alive
 
-import os, time, asyncio, ccxt, json, pandas as pd
+import os, asyncio, ccxt, json, pandas as pd
 import ta # Technical analysis
 from telegram import Update
 from telegram.ext import Application
@@ -202,12 +204,23 @@ async def main_async():
     global application
     application = Application.builder().token(TOKEN).build()
 
-    await send_alert("🤖 BRIAN V4 ONLINE\nI will send FULL market analysis every 15min\n+ Instant alerts on every buy/sell")
+    await send_alert("🤖 BRIAN V4 ONLINE\nI will send FULL market analysis every 15min\n+ Instant alerts on every buy/sell + Keep Alive Active")
 
     asyncio.create_task(run_every(900, research_and_trade)) # 15min scan
     asyncio.create_task(trade_watcher()) # 1min watcher
+    asyncio.create_task(keep_alive()) # ADDED: KEEP ALIVE TASK
 
     await application.run_polling()
+
+# ADDED: KEEP ALIVE FUNCTION FOR RENDER FREE
+async def keep_alive():
+    while True:
+        try:
+            requests.get("https://bitget-bot-sg5v.onrender.com") # pings your own bot
+            print("Pinged self to stay alive")
+        except:
+            pass
+        await asyncio.sleep(240) # every 4 minutes
 
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
