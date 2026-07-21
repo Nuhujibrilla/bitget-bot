@@ -1,5 +1,5 @@
 from flask import Flask
-import threading, time, requests, os
+import threading, time, requests, os, asyncio
 import ccxt, json, pandas as pd, datetime
 import ta
 import nest_asyncio 
@@ -81,7 +81,6 @@ async def research_and_trade():
         avg_24h = sum(d['change_24h'] for d in scanned) / total if total > 0 else 0
         top3 = scanned[:3]
 
-        # BUILD FULL REPORT LIKE YOUR SCREENSHOT
         report = f"""📌 <b>BRIAN MARKET REPORT</b>
 ⚠️ <b>Top 100 Scan Complete</b>
 
@@ -93,7 +92,7 @@ async def research_and_trade():
 📊 <b>Market Breadth:</b> {bullish}/{total} above MA50
 📈 <b>Avg 24h Move:</b> {avg_24h:.2f}%
 
-━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━
 👑 <b>TOP 3 GAINERS</b>"""
         for i, coin in enumerate(top3, 1):
             report += f"""
@@ -103,7 +102,6 @@ async def research_and_trade():
         
         report += "\n━━━━━━━━━━━━"
         
-        # AUTO BUY LOGIC
         best = top3[0] if top3 else None
         if best and best['change_1h'] > 3 and best['rsi'] < 70 and best['above_ma50']:
             if best['symbol'] not in positions:
@@ -154,7 +152,7 @@ def home(): return "Brian is alive"
 async def main():
     global application
     application = Application.builder().token(TOKEN).build()
-    await send_alert("🤖 <b>BRIAN V12 ONLINE</b>\nFull Market Reports Every 10min")
+    await send_alert("🤖 <b>BRIAN V12.1 ONLINE</b>\nFull Market Reports Every 10min")
     asyncio.create_task(run_every(SCAN_INTERVAL, research_and_trade))
     asyncio.create_task(run_every(60, check_positions))
     await application.run_polling()
