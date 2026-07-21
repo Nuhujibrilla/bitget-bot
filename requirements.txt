@@ -1,5 +1,7 @@
-ccxt
-python-telegram-bot
 flask
+ccxt
 pandas
 ta
+python-telegram-bot
+requests
+nest_asyncio
