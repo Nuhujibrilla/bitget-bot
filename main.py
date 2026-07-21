@@ -1,4 +1,8 @@
-import os, time, threading, asyncio, ccxt, json
+from flask import Flask
+import threading
+app = Flask('') # Keep Render alive
+
+import os, time, asyncio, ccxt, json
 from telegram import Update
 from telegram.ext import Application
 
@@ -36,13 +40,13 @@ async def research_and_trade():
             price = ticker['last']
 
             if volume < MIN_VOLUME: scam_count +=1; continue
-            if price > 5 and change is not None and change > 0.5: # Added "is not None"
+            if price > 5 and change is not None and change > 0.5:
                 score = change + (volume / 1000000)
                 scored_coins.append({'symbol': symbol, 'price': price, 'change': change, 'score': score})
         except: pass
 
     if not scored_coins:
-        await application.bot.send_message(CHAT_ID, "📊 BRIAN REPORT\nNo safe coins found this scan.")
+        await application.bot.send_message(CHAT_ID, "📊 BRIAN REPORT\n⏰ " + time.strftime('%H:%M') + "\nNo safe coins found this scan.")
         return
 
     scored_coins.sort(key=lambda x: x['score'], reverse=True)
@@ -89,13 +93,13 @@ async def trade_watcher():
 
 def get_top_100_coins():
     markets = exchange.load_markets()
-    return [s for s in markets if '/USDT' in s and markets[s]['active']][:100]
+    return [s for s in markets if '/USDT' in s and markets[s]['active']][:100] # 100 coins = stable for Render
 
 def main():
     global application
     application = Application.builder().token(TOKEN).build()
     # Startup message
-    asyncio.run(application.bot.send_message(CHAT_ID, "🤖 BRIAN IS ONLINE\n24/7 Auto Trading Started"))
+    asyncio.run(application.bot.send_message(CHAT_ID, "🤖 BRIAN IS ONLINE\n24/7 Auto Trading Started\nScanning: 100 coins\nEvery: 15min"))
     threading.Thread(target=lambda: asyncio.run(run_every(900, research_and_trade)), daemon=True).start() # 15min
     threading.Thread(target=lambda: asyncio.run(trade_watcher()), daemon=True).start() # 1min
     application.run_polling()
@@ -103,4 +107,14 @@ def main():
 async def run_every(seconds, func):
     while True: await func(); await asyncio.sleep(seconds)
 
-if __name__ == "__main__": main()
+# KEEP RENDER ALIVE - THIS STOPS THE CRASH
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
+
+@app.route('/')
+def home():
+    return "Brian is alive"
+
+if __name__ == "__main__":
+    threading.Thread(target=run_flask).start() # Keep Render awake
+    main()
