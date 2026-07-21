@@ -4,6 +4,8 @@ import time
 import requests
 import os, asyncio, ccxt, json, pandas as pd
 import ta
+import nest_asyncio # ADDED
+nest_asyncio.apply() # ADDED
 from telegram.ext import Application
 
 app = Flask('') # Keep Render alive
@@ -95,7 +97,7 @@ Market: {verdict}"""
         except Exception as e:
             await send_alert(f"❌ Buy failed: {best['symbol']} Error: {e}")
 
-    top5 = "\n".join([f"{i+1}. {d['symbol']} +{d['change']:.2f}%" for i,d in enumerate(scored_coins[:5])])
+    top5 = "\n".join([f"{i+1}. {d['symbol']} +{d['change']:.2f}%" for i,d in enumerate(scored_coins[:5])
     market_opinion = f"Best play: {best['symbol']}" if len(scored_coins) >= 1 else "Market is trash. Sitting in cash."
     holdings = "\n💼 Active Positions:\n" + "\n".join([f"- {k} @ ${v['entry']:.4f}" for k,v in positions.items()]) if positions else "\n💼 Active Positions: None."
     full_report = f"""📊 BRIAN MARKET ANALYSIS
@@ -137,7 +139,6 @@ async def run_every(seconds, func):
         await func()
         await asyncio.sleep(seconds)
 
-# KEEP ALIVE FUNCTION
 async def keep_alive():
     while True:
         try: requests.get("https://bitget-bot-sg5v.onrender.com")
@@ -145,7 +146,7 @@ async def keep_alive():
         await asyncio.sleep(240)
 
 def run_flask():
-    app.run(host='0.0.0.0', port=10000, use_reloader=False) # FIX: no reloader
+    app.run(host='0.0.0.0', port=10000, use_reloader=False)
 
 @app.route('/')
 def home():
@@ -161,5 +162,5 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    threading.Thread(target=run_flask, daemon=True).start() # FIX: daemon thread
-    asyncio.run(main())
+    threading.Thread(target=run_flask, daemon=True).start()
+    asyncio.get_event_loop().run_until_complete(main()) # CHANGED THIS LINE
